@@ -225,14 +225,6 @@ pipeline {
                 }
             }
         }
-        stage('cleanup') {
-            steps {
-                echo '🧹 Cleaning up workspace...'
-                cleanWs()
-                echo '✅ Workspace cleaned up.'
-            }
-        }
-
     }
     post {
         success {
