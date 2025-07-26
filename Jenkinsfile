@@ -51,10 +51,6 @@ pipeline {
                         name: 'origin',
                     ]],
                 ]
-                sh 'pwd'
-                sh 'cd pipeline_startup'
-                sh 'mv pipeline_startup/welcome_note.sh /home/jenkins/.jenkins/workspace/Weatherapp_Weatherapp_master'
-                sh 'cd ..'
             }
         }
         stage('parallel_build') {
@@ -229,14 +225,6 @@ pipeline {
                 }
             }
         }
-        stage('cleanup') {
-            steps {
-                echo '🧹 Cleaning up workspace...'
-                cleanWs()
-                echo '✅ Workspace cleaned up.'
-            }
-        }
-
     }
     post {
         success {
