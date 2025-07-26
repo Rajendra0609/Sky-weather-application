@@ -164,7 +164,7 @@ pipeline {
                 '''
                 echo '✅ Docker image built successfully.'
                 dockerImage = docker.image("${params.DOCKERHUBREPO}:latest")
-                dockerTag = "${params.DOCKERHUBREPO}:$(params.VERSION)"
+                dockerTag = "${params.DOCKERHUBREPO}:${params.VERSION}"
                 dockerTag = "${params.DOCKERHUBREPO}:latest"
                 echo '✅ Docker image built successfully.'
             }
