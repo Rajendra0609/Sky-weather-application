@@ -133,8 +133,6 @@ pipeline {
                 echo '✅ Lynis security scan completed.'
                 archiveArtifacts artifacts: 'artifacts/lynis/lynis-report.log', allowEmptyArchive: true
                 archiveArtifacts artifacts: 'artifacts/lynis/lynis-report.html', allowEmptyArchive: true
-                junit 'artifacts/lynis/lynis-report.html'
-                junit 'artifacts/lynis/lynis-report.log'
                 echo '📄 Publishing Lynis report...'
                 echo '✅ Lynis report published successfully.'
                 error('Lynis scan completed with errors. Please review the report for details.')
