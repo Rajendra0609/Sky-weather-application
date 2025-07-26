@@ -31,7 +31,7 @@ pipeline {
         string(name: 'VERSION', defaultValue: 'latest', description: 'Version of the Docker image')        
     }
     environment {
-        DOCKER_HUB_CREDENTIALS_ID = 'docker'
+        DOCKER_HUB_CREDENTIALS_ID = 'dockerhub'
         GIT_BRANCH = "${params.GIT_BRANCH}"
         GITHUB_CREDENTIALS_ID = 'github_Rajendra0609'
         GITHUB_REPO = 'Rajendra0609/Sky-weather-application'
@@ -135,7 +135,6 @@ pipeline {
                 archiveArtifacts artifacts: 'artifacts/lynis/lynis-report.html', allowEmptyArchive: true
                 echo '📄 Publishing Lynis report...'
                 echo '✅ Lynis report published successfully.'
-                
             }
         }
         stage('SonarQube_Scan') {
@@ -143,78 +142,69 @@ pipeline {
                 echo '🔍 Starting SonarQube scan...'
                 //script {
                     //withSonarQubeEnv('sonarqube') {
-                        sh '''
-                            chmod +x welcome_note.sh
-                            ./welcome_note.sh
-                        '''
-                   // }
-                }
+                        //sh '''
+                            //chmod +x welcome_note.sh
+                            //./welcome_note.sh
+                        //'''
+                    //}
+                //}
                 echo '✅ SonarQube scan completed.'
             }
         }
         stage('Docker_Build') {
-            steps {
-                echo '🐳 Building Docker image...'
-                sh '''
-                    chmod +x welcome_note.sh
-                    ./welcome_note.sh
-                '''
-                echo '✅ Docker image built successfully.'
-                script {
-                    dockerImage = docker.image("${params.DOCKERHUBREPO}:latest .")
-                    dockerTag = "${params.DOCKERHUBREPO}:${params.VERSION}"
-                }
-                echo '✅ Docker image built successfully.'
-            }
+    steps {
+        echo '🐳 Building Docker image...'
+        sh '''
+            chmod +x welcome_note.sh
+            ./welcome_note.sh
+        '''
+        script {
+            dockerImage = docker.build("${params.DOCKERHUBREPO}:${params.VERSION}", "-f Dockerfile .")
+            dockerTag = "${params.DOCKERHUBREPO}:${params.VERSION}"
         }
-        stage('trivy') {
-            steps {
-                echo '🔍 Starting Trivy scan...'
-                sh '''
-                    chmod +x welcome_note.sh
-                    ./welcome_note.sh
-                    trivy image --format json --output trivy-report.json --severity HIGH,CRITICAL ${params.DOCKERHUBREPO}:latest || true
-                '''
-                echo '✅ Trivy scan completed.'
-            }
-            post {
-                always {
-                    archiveArtifacts artifacts: 'trivy-report.json', allowEmptyArchive: true
-                    junit 'trivy-report.json'
-                    echo '📄 Publishing Trivy report...'
-                }
-            }
+        echo '✅ Docker image built successfully.'
+    }
+}
+
+        stage('Trivy') {
+    steps {
+        echo '🔍 Starting Trivy scan...'
+
+        script {
+            def imageName = "${params.DOCKERHUBREPO}:latest"
+
+            sh """#!/bin/bash
+                chmod +x welcome_note.sh
+                ./welcome_note.sh
+
+                trivy image --format json --output trivy-report.json --severity HIGH,CRITICAL ${imageName} || true
+            """
         }
+
+        echo '✅ Trivy scan completed.'
+    }
+
+    post {
+        always {
+            echo '📄 Archiving Trivy scan reports...'
+            archiveArtifacts artifacts: 'trivy-report.json', allowEmptyArchive: true
+        }
+    }
+}
+
         stage('Docker_Push') {
             steps {
                 echo '🚀 Pushing Docker image to Docker Hub...'
                 script {
                     docker.withRegistry('https://registry.hub.docker.com', "${DOCKER_HUB_CREDENTIALS_ID}") {
-                    dockerImage.push("${params.VERSION}")
+                        dockerImage.push("latest")
                     }
                 }
                 echo '✅ Docker image pushed successfully.'
             }
         }
-        stage('Create GitHub Release') {
-            steps {
-                echo '🚀 Creating GitHub release...'
-                script {
-                    def release = createGitHubRelease(
-                        repo: "${GITHUB_REPO}",
-                        tagName: "${params.VERSION}",
-                        name: "Release ${params.VERSION}",
-                        body: "Release notes for version ${params.VERSION}",
-                        draft: false,
-                        prerelease: false,
-                        credentialsId: "${GITHUB_CREDENTIALS_ID}"
-                    )
-                    echo "GitHub release created: ${release.html_url}"
-                }
-            }
-        }
-    }
-        post {
+        
+      post {
     success {
         echo 'Build & Deploy completed successfully!'
         mail to: "${EMAIL_RECIPIENTS}",
