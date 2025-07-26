@@ -141,13 +141,13 @@ pipeline {
         stage('SonarQube_Scan') {
             steps {
                 echo '🔍 Starting SonarQube scan...'
-                script {
-                    withSonarQubeEnv('sonarqube') {
+                //script {
+                    //withSonarQubeEnv('sonarqube') {
                         sh '''
                             chmod +x welcome_note.sh
                             ./welcome_note.sh
                         '''
-                    }
+                   // }
                 }
                 echo '✅ SonarQube scan completed.'
             }
