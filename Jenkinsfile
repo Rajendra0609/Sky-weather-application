@@ -52,7 +52,7 @@ pipeline {
                     ]],
                 ]
                 sh 'pwd'
-                sh cd pipeline_startup
+                sh 'cd pipeline_startup'
                 sh 'mv pipeline_startup/welcome_note.sh /home/jenkins/.jenkins/workspace/Weatherapp_Weatherapp_master'
                 sh 'cd ..'
             }
