@@ -51,11 +51,6 @@ pipeline {
                         name: 'origin',
                     ]],
                 ]
-                sh 'pwd'
-                sh 'ls'
-                sh 'cd pipeline_startup'
-                sh 'mv pipeline_startup/welcome_note.sh /home/jenkins/.jenkins/workspace/Weatherapp_Weatherapp_master'
-                sh 'cd ..'
             }
         }
         stage('parallel_build') {
