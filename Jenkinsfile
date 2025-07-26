@@ -1,4 +1,3 @@
-@Library('my-shared-library@master') _
 pipeline {
     agent{
         kubernetes {
