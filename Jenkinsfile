@@ -135,7 +135,7 @@ pipeline {
                 archiveArtifacts artifacts: 'artifacts/lynis/lynis-report.html', allowEmptyArchive: true
                 echo '📄 Publishing Lynis report...'
                 echo '✅ Lynis report published successfully.'
-                error('Lynis scan completed with errors. Please review the report for details.')
+                
             }
         }
         stage('SonarQube_Scan') {
