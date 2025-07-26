@@ -39,6 +39,21 @@ pipeline {
         EMAIL_RECIPIENTS = 'rajendra.daggubati09@gmail.com'
     }
     stages {
+        stage('Checkout_startup') {
+            steps {
+                echo '🔄 cloing the code'
+                checkout scm: [
+                    $class: 'GitSCM',
+                    branches: [[name: "${params.GIT_BRANCH}"]],
+                    userRemoteConfigs: [[
+                        url: "https://github.com/Rajendra0609/Sky-weather-application.git",
+                        credentialsId: 'github_Rajendra0609',
+                        name: 'origin',
+                    ]],
+                ]
+            
+            }
+        }
         stage('parallel_build') {
             parallel {
                 stage('Build') {
@@ -46,8 +61,7 @@ pipeline {
                         echo '🔨 Starting build process...'
                         script {
                            sh 'chmod +x welcome_note.sh'
-                           sh './welcome_note.sh'
-                           sh 'npm ci'  
+                           sh './welcome_note.sh'  
                            sh 'npm install' 
                         }
                         echo '🔨 Build process completed.'
@@ -57,7 +71,6 @@ pipeline {
                 stage('Build_Application') {
                     steps {
                         echo '🔨 Installing dependencies and building the project...'
-                        sh 'npm ci'
                         sh 'chmod +x welcome_note.sh'
                         sh './welcome_note.sh'
                         sh 'npm install'
@@ -71,7 +84,7 @@ pipeline {
                 stage('Unit_Test') {
                     steps {
                         echo '🧪 Running unit tests...'
-                        sh 'npm ci'
+                        
                         sh 'chmod +x welcome_note.sh'
                         sh './welcome_note.sh'
                         echo '➕ Adding Jest and Supertest as dev dependencies...'
@@ -83,7 +96,7 @@ pipeline {
                 }
                 stage('Integration_Test') {
                     steps {
-                        sh 'npm ci'
+                        
                         sh 'chmod +x welcome_note.sh'
                         sh './welcome_note.sh'
                         echo '➕ Adding Jest and Supertest as dev dependencies...'
