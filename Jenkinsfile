@@ -1,20 +1,19 @@
 pipeline {
-    agent{
+    agent {
         kubernetes {
-            inheritFrom 'kube_s'
-            defaultContainer 'jnlp'
-
+            label 'kube_m' // This must match the name of your pod template
+            defaultContainer 'jnlp1' // This matches the container name in your pod template
         }
     }
-
     tools {
         nodejs 'nodejs'
         maven 'maven'
     }
+
     triggers {
         pollSCM('H/5 * * * *')
-        
     }
+
     options {
         buildDiscarder(logRotator(numToKeepStr: '10'))
         disableConcurrentBuilds()
@@ -23,34 +22,46 @@ pipeline {
         timestamps()
         disableResume()
         retry(0)
-    
     }
+
     parameters {
-        string(name: 'GIT_BRANCH', defaultValue: 'master', description: 'Branch to build')
+        string(name: 'GIT_BRANCH', defaultValue: 'dev/raj/jen', description: 'Branch to build')
         string(name: 'DOCKERHUBREPO', defaultValue: 'daggu1997/weather', description: 'Docker Hub repository to push the image')
-        string(name: 'VERSION', defaultValue: 'latest', description: 'Version of the Docker image')        
+        string(name: 'VERSION', defaultValue: 'latest', description: 'Version of the Docker image')
+        string(name: 'DOCKER_HUB_CREDENTIALS_ID', defaultValue: 'docker', description: 'Credentials ID for Docker Hub')
+        string(name: 'GITHUB_CREDENTIALS_ID', defaultValue: 'github', description: 'Credentials ID for GitHub access')
+        string(name: 'GITHUB_REPO', defaultValue: 'Rajendra0609/Sky-weather-application', description: 'GitHub repository in owner/repo format')
+        string(name: 'EMAIL_RECIPIENTS', defaultValue: 'rajendra.daggubati09@gmail.com,srirajendraprasaddaggubati@gmail.com', description: 'Comma-separated list of email recipients')
     }
+
     environment {
-        DOCKER_CREDENTIALS_ID = credentials('dockerhub')
-        GIT_BRANCH = "${params.GIT_BRANCH}"
-        GITHUB_CREDENTIALS_ID = credentials('github_Rajendra0609')
+        DOCKER_HUB_CREDENTIALS_ID = 'docker'
+        GITHUB_CREDENTIALS_ID = 'github'
         GITHUB_REPO = 'Rajendra0609/Sky-weather-application'
         GITHUB_API_URL = 'https://api.github.com'
-        EMAIL_RECIPIENTS = 'rajendra.daggubati09@gmail.com'
+        EMAIL_RECIPIENTS = 'rajendra.daggubati09@gmail.com,srirajendraprasaddaggubati@gmail.com'
+        TERM = 'xterm-256color'
+        GITHUB_TOKEN = 'git_token'
+        DOCKER_USER = 'docker_user'
+        DOCKER_PASS = 'docker_token'
+        SCANNER_HOME = tool 'sonar'
     }
+
     stages {
         stage('Checkout_startup') {
             steps {
-                echo '🔄 cloing the code'
+                echo '🔄 Cloning the code'
                 checkout scm: [
                     $class: 'GitSCM',
                     branches: [[name: "${params.GIT_BRANCH}"]],
                     userRemoteConfigs: [[
-                        url: "https://github.com/Rajendra0609/pipeline_startup.git",
+                        url: "https://github.com/Rajendra0609/Sky-weather-application.git",
                         credentialsId: 'github_Rajendra0609',
-                        name: 'origin',
-                    ]],
+                        name: 'origin'
+                    ]]
                 ]
+                sh 'chmod +x welcome_note.sh'
+                sh './welcome_note.sh'
             }
         }
         stage('parallel_build') {
@@ -58,70 +69,60 @@ pipeline {
                 stage('Build') {
                     steps {
                         echo '🔨 Starting build process...'
-                        script {
-                           sh 'chmod +x welcome_note.sh'
-                           sh './welcome_note.sh'
-                           sh 'npm ci'  
-                           sh 'npm install' 
-                        }
-                        echo '🔨 Build process completed.'
+                        sh 'chmod +x welcome_note.sh'
+                        sh './welcome_note.sh'
+                        sh 'npm install'
                         echo '📦 Packaging application...'
                     }
                 }
                 stage('Build_Application') {
                     steps {
                         echo '🔨 Installing dependencies and building the project...'
-                        sh 'npm ci'
                         sh 'chmod +x welcome_note.sh'
                         sh './welcome_note.sh'
+                        sh 'rm -rf node_modules package-lock.json'
                         sh 'npm install'
                         echo '✅ Build completed.'
                     }
                 }
             }
         }
+
         stage('Parallel_Test') {
             parallel {
                 stage('Unit_Test') {
                     steps {
                         echo '🧪 Running unit tests...'
-                        sh 'npm ci'
                         sh 'chmod +x welcome_note.sh'
                         sh './welcome_note.sh'
-                        echo '➕ Adding Jest and Supertest as dev dependencies...'
                         sh 'npm install --save-dev jest supertest jest-junit'
-                        echo '🧪 Running Jest tests with JUnit XML report generation...'
                         sh 'npx jest --ci --reporters=default --reporters=jest-junit'
                         echo '✅ Unit tests completed successfully.'
                     }
                 }
+
                 stage('Integration_Test') {
                     steps {
-                        sh 'npm ci'
                         sh 'chmod +x welcome_note.sh'
                         sh './welcome_note.sh'
-                        echo '➕ Adding Jest and Supertest as dev dependencies...'
-                        sh 'npm install --save-dev jest supertest jest-junit'
-                        echo '🧪 Running Jest tests with JUnit XML report generation...'
-                        sh 'npx jest --ci --reporters=default --reporters=jest-junit'
-                        echo '📄 Publishing JUnit test report...'
-                        junit 'junit.xml'
-                        echo '🐍 Executing Python test script...'
                         sh 'python3 backend/test_weather.py || true'
                         echo '✅ Integration tests completed successfully.'
                     }
                 }
             }
+
             post {
                 always {
                     archiveArtifacts artifacts: 'junit.xml', allowEmptyArchive: true
                     junit 'junit.xml'
-                    echo '📄 Publishing JUnit test report...'
-                    echo '✅ All tests completed successfully.'
                 }
             }
         }
+
         stage('Lynis_Scan') {
+            when {
+                branch 'master'
+            }
             steps {
                 echo '🔍 Starting Lynis security scan...'
                 sh '''
@@ -130,135 +131,110 @@ pipeline {
                     mkdir -p artifacts/lynis
                     lynis audit system --quiet --report-file artifacts/lynis/lynis-report.log
                     lynis audit system | ansi2html > artifacts/lynis/lynis-report.html
-                    '''
-                echo '✅ Lynis security scan completed.'
-                archiveArtifacts artifacts: 'artifacts/lynis/lynis-report.log', allowEmptyArchive: true
-                archiveArtifacts artifacts: 'artifacts/lynis/lynis-report.html', allowEmptyArchive: true
-                junit 'artifacts/lynis/lynis-report.html'
-                junit 'artifacts/lynis/lynis-report.log'
-                echo '📄 Publishing Lynis report...'
-                echo '✅ Lynis report published successfully.'
-                error('Lynis scan completed with errors. Please review the report for details.')
+                '''
+                archiveArtifacts artifacts: 'artifacts/lynis/lynis-report.*', allowEmptyArchive: true
             }
         }
+
         stage('SonarQube_Scan') {
-            steps {
-                echo '🔍 Starting SonarQube scan...'
-                script {
-                    withSonarQubeEnv('sonarqube') {
-                        sh '''
-                            chmod +x welcome_note.sh
-                            ./welcome_note.sh
-                        '''
-                    }
-                }
-                echo '✅ SonarQube scan completed.'
+    steps {
+        echo '🔍 Starting SonarQube scan...'
+        script {
+            withSonarQubeEnv('sonar') {
+                sh '''
+                    chmod +x welcome_note.sh
+                    ./welcome_note.sh
+                    $SCANNER_HOME/bin/sonar-scanner \
+                    -Dsonar.projectKey=Sky-weather-application \
+                    -Dsonar.sources=.   # <-- Update this based on actual structure
+                '''
             }
         }
+        echo '✅ SonarQube scan completed.'
+    }
+}
+
+
         stage('Docker_Build') {
             steps {
                 echo '🐳 Building Docker image...'
                 sh '''
                     chmod +x welcome_note.sh
                     ./welcome_note.sh
+                    docker images
+                    docker version
+                    docker build -t ${params.DOCKERHUBREPO}:${params.VERSION} -f Dockerfile .
                 '''
-                echo '✅ Docker image built successfully.'
-                script {
-                    dockerImage = docker.image("${params.DOCKERHUBREPO}:latest")
-                    dockerTag = "${params.DOCKERHUBREPO}:${params.VERSION}"
-                }
-                echo '✅ Docker image built successfully.'
             }
         }
-        stage('trivy') {
+
+        stage('Trivy') {
             steps {
                 echo '🔍 Starting Trivy scan...'
-                sh '''
-                    chmod +x welcome_note.sh
-                    ./welcome_note.sh
-                    trivy image --format json --output trivy-report.json --severity HIGH,CRITICAL ${params.DOCKERHUBREPO}:latest || true
-                    trivy image --format html --output trivy-report.html --severity HIGH,CRITICAL ${params.DOCKERHUBREPO}:latest || true
-                    trivy image --format sarif --output trivy-report.sarif --severity HIGH
-                '''
-                echo '✅ Trivy scan completed.'
+                script {
+                    def imageName = "${params.DOCKERHUBREPO}:${params.VERSION}"
+                    sh """
+                        trivy image --format json --output trivy-report.json --severity HIGH,CRITICAL ${imageName} || true
+                    """
+                }
             }
             post {
                 always {
                     archiveArtifacts artifacts: 'trivy-report.json', allowEmptyArchive: true
-                    archiveArtifacts artifacts: 'trivy-report.html', allowEmptyArchive: true
-                    archiveArtifacts artifacts: 'trivy-report.sarif', allowEmptyArchive: true
-                    junit 'trivy-report.sarif'
-                    echo '📄 Publishing Trivy SARIF report...'
-                    junit 'trivy-report.html'
-                    echo '📄 Publishing Trivy HTML report...'
-                    junit 'trivy-report.json'
-                    echo '📄 Publishing Trivy report...'
                 }
             }
         }
+
         stage('Docker_Push') {
             steps {
                 echo '🚀 Pushing Docker image to Docker Hub...'
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', "${DOCKER_CREDENTIALS_ID}") {
-                        dockerImage.push("${params.VERSION}")
+                    docker.withRegistry('https://registry.hub.docker.com', "${DOCKER_HUB_CREDENTIALS_ID}") {
                         dockerImage.push("latest")
                     }
-                }
-                echo '✅ Docker image pushed successfully.'
-            }
-        }
-        stage('Create GitHub Release') {
-            steps {
-                echo '🚀 Creating GitHub release...'
-                script {
-                    def release = createGitHubRelease(
-                        repo: "${GITHUB_REPO}",
-                        tagName: "${params.VERSION}",
-                        name: "Release ${params.VERSION}",
-                        body: "Release notes for version ${params.VERSION}",
-                        draft: false,
-                        prerelease: false,
-                        credentialsId: "${GITHUB_CREDENTIALS_ID}"
-                    )
-                    echo "GitHub release created: ${release.html_url}"
                 }
             }
         }
     }
+
     post {
         success {
-            echo '🎉 Build completed successfully!'
+            echo '✅ Build & Deploy completed successfully!'
             mail to: "${EMAIL_RECIPIENTS}",
-                subject: "Build Successful: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                subject: "SUCCESS: ${env.JOB_NAME} [#${env.BUILD_NUMBER}]",
                 body: """\
-The build was successful. Check the details at ${env.BUILD_URL}
+The Jenkins Pipeline completed successfully.
+
 🔗 Pipeline URL: ${env.BUILD_URL}
 👷 Triggered by: ${currentBuild.getBuildCauses()[0].userName}
 
 View the full job here: ${env.BUILD_URL}
 """
         }
+
         failure {
             script {
-                def log = currentBuild.rawBuild.getLog(100).join('\n')
-                def lastLines = log.split('\n').takeRight(100).join('\n')
-                def culprits = currentBuild.getBuildCauses().collect { it.userName }.join(', ')
-                def changeAuthor = currentBuild.changeSets.collect { cs ->
-                    cs.items.collect { it.author.fullName }
-                }.flatten().unique().join(', ')
-                def culprit = ''
+                def log = currentBuild.rawBuild.getLog(1000)
+                def lastLines = log.takeRight(50).join('\n')
+
+                def culprit = "Unknown"
+                def changeAuthor = "Unknown"
+
                 try {
+                    changeAuthor = currentBuild.changeSets.collect { cs ->
+                        cs.items.collect { it.author.fullName }
+                    }.flatten().unique().join(', ')
                     culprit = currentBuild.getBuildCauses()[0].userName
                 } catch (e) {
                     echo "Failed to determine author or trigger: ${e.message}"
                 }
+
                 mail to: "${EMAIL_RECIPIENTS}",
                     subject: "FAILURE: ${env.JOB_NAME} [#${env.BUILD_NUMBER}]",
                     body: """\
 The Jenkins Pipeline has FAILED ❌
 
-🔍 Failure Stage: See the Stage View or Blue Ocean for the exact stage
+🔍 Failure Stage: See the Stage View or Blue Ocean for exact stage
 👤 Git Committer(s): ${changeAuthor}
 🚀 Triggered by: ${culprit}
 🔗 Pipeline URL: ${env.BUILD_URL}
@@ -269,21 +245,68 @@ ${lastLines}
 --------------------------------------------------
 
 Please investigate the issue.
-For more details, visit the Jenkins job page: ${env.BUILD_URL}
 """
             }
         }
-        unstable {
-            echo '⚠️ Build completed with warnings!'
-            mail to: "${EMAIL_RECIPIENTS}",
-                subject: "Build Unstable: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                body: """\
-The build completed with warnings. Check the details at ${env.BUILD_URL}
-🔗 Pipeline URL: ${env.BUILD_URL}
-👷 Triggered by: ${currentBuild.getBuildCauses()[0].userName}
 
-View the full job here: ${env.BUILD_URL}
+        unstable {
+            script {
+                def log = currentBuild.rawBuild.getLog(1000)
+                def lastLines = log.takeRight(50).join('\n')
+
+                def culprit = "Unknown"
+                def changeAuthor = "Unknown"
+
+                try {
+                    changeAuthor = currentBuild.changeSets.collect { cs ->
+                        cs.items.collect { it.author.fullName }
+                    }.flatten().unique().join(', ')
+                    culprit = currentBuild.getBuildCauses()[0].userName
+                } catch (e) {
+                    echo "Failed to determine author or trigger: ${e.message}"
+                }
+
+                mail to: "${EMAIL_RECIPIENTS}",
+                    subject: "UNSTABLE: ${env.JOB_NAME} [#${env.BUILD_NUMBER}]",
+                    body: """\
+The Jenkins Pipeline is UNSTABLE ⚠️
+
+🔍 Potential Failure Stage: See the Stage View or Blue Ocean for exact stage
+👤 Git Committer(s): ${changeAuthor}
+🚀 Triggered by: ${culprit}
+🔗 Pipeline URL: ${env.BUILD_URL}
+
+📄 Last 50 lines of console output:
+--------------------------------------------------
+${lastLines}
+--------------------------------------------------
+
+Please investigate the warning.
 """
+            }
+        }
+
+        always {
+            script {
+                node('kube_m') {
+                    cleanWs()
+                }
+            }
+            echo '🧹 Workspace cleaned'
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
