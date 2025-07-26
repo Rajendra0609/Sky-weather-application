@@ -31,7 +31,7 @@ pipeline {
         string(name: 'VERSION', defaultValue: 'latest', description: 'Version of the Docker image')        
     }
     environment {
-        DOCKER_CREDENTIALS_ID = credentials('docker')
+        DOCKER_CREDENTIALS_ID = credentials('dockerhub')
         GIT_BRANCH = "${params.GIT_BRANCH}"
         GITHUB_CREDENTIALS_ID = credentials('github_Rajendra0609')
         GITHUB_REPO = 'Rajendra0609/Sky-weather-application'
@@ -238,6 +238,8 @@ pipeline {
     post {
         always {
             echo '📝 Writing test results to file...'
+            // Disabled due to Jenkins script security sandbox restrictions on getRawBuild method
+            /*
             script {
                 def testResults = currentBuild.rawBuild.getAction(hudson.tasks.junit.TestResultAction.class)
                 if (testResults) {
@@ -252,6 +254,7 @@ pipeline {
                 }
             }
             echo '✅ Test results written successfully.'
+            */
             archiveArtifacts artifacts: '**/*', allowEmptyArchive: true    
         }
         success {
