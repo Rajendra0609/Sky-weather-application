@@ -31,9 +31,9 @@ pipeline {
         string(name: 'VERSION', defaultValue: 'latest', description: 'Version of the Docker image')        
     }
     environment {
-        DOCKER_CREDENTIALS_ID = credentials('dockerhub')
+        DOCKER_HUB_CREDENTIALS_ID = 'docker'
         GIT_BRANCH = "${params.GIT_BRANCH}"
-        GITHUB_CREDENTIALS_ID = credentials('github_Rajendra0609')
+        GITHUB_CREDENTIALS_ID = 'github_Rajendra0609'
         GITHUB_REPO = 'Rajendra0609/Sky-weather-application'
         GITHUB_API_URL = 'https://api.github.com'
         EMAIL_RECIPIENTS = 'rajendra.daggubati09@gmail.com'
@@ -161,7 +161,7 @@ pipeline {
                 '''
                 echo '✅ Docker image built successfully.'
                 script {
-                    dockerImage = docker.image("${params.DOCKERHUBREPO}:latest")
+                    dockerImage = docker.image("${params.DOCKERHUBREPO}:latest .")
                     dockerTag = "${params.DOCKERHUBREPO}:${params.VERSION}"
                 }
                 echo '✅ Docker image built successfully.'
@@ -174,20 +174,12 @@ pipeline {
                     chmod +x welcome_note.sh
                     ./welcome_note.sh
                     trivy image --format json --output trivy-report.json --severity HIGH,CRITICAL ${params.DOCKERHUBREPO}:latest || true
-                    trivy image --format html --output trivy-report.html --severity HIGH,CRITICAL ${params.DOCKERHUBREPO}:latest || true
-                    trivy image --format sarif --output trivy-report.sarif --severity HIGH
                 '''
                 echo '✅ Trivy scan completed.'
             }
             post {
                 always {
                     archiveArtifacts artifacts: 'trivy-report.json', allowEmptyArchive: true
-                    archiveArtifacts artifacts: 'trivy-report.html', allowEmptyArchive: true
-                    archiveArtifacts artifacts: 'trivy-report.sarif', allowEmptyArchive: true
-                    junit 'trivy-report.sarif'
-                    echo '📄 Publishing Trivy SARIF report...'
-                    junit 'trivy-report.html'
-                    echo '📄 Publishing Trivy HTML report...'
                     junit 'trivy-report.json'
                     echo '📄 Publishing Trivy report...'
                 }
@@ -197,9 +189,8 @@ pipeline {
             steps {
                 echo '🚀 Pushing Docker image to Docker Hub...'
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', "${DOCKER_CREDENTIALS_ID}") {
-                        dockerImage.push("${params.VERSION}")
-                        dockerImage.push("latest")
+                    docker.withRegistry('https://registry.hub.docker.com', "${DOCKER_HUB_CREDENTIALS_ID}") {
+                    dockerImage.push("${params.VERSION}")
                     }
                 }
                 echo '✅ Docker image pushed successfully.'
