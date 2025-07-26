@@ -51,7 +51,10 @@ pipeline {
                         name: 'origin',
                     ]],
                 ]
-                sh 'mv pipeline_startup/*.sh /home/jenkins/.jenkins/workspace/'
+                sh 'pwd'
+                sh cd pipeline_startup
+                sh 'mv pipeline_startup/welcome_note.sh /home/jenkins/.jenkins/workspace/Weatherapp_Weatherapp_master'
+                sh 'cd ..'
             }
         }
         stage('parallel_build') {
@@ -60,8 +63,8 @@ pipeline {
                     steps {
                         echo '🔨 Starting build process...'
                         script {
-                           sh 'chmod +x *.sh'
-                           sh './*.sh'
+                           sh 'chmod +x welcome_note.sh'
+                           sh './welcome_note.sh'
                            sh 'npm ci'  
                            sh 'npm install' 
                         }
@@ -73,8 +76,8 @@ pipeline {
                     steps {
                         echo '🔨 Installing dependencies and building the project...'
                         sh 'npm ci'
-                        sh 'chmod +x *.sh'
-                        sh './*.sh'
+                        sh 'chmod +x welcome_note.sh'
+                        sh './welcome_note.sh'
                         sh 'npm install'
                         echo '✅ Build completed.'
                     }
@@ -87,8 +90,8 @@ pipeline {
                     steps {
                         echo '🧪 Running unit tests...'
                         sh 'npm ci'
-                        sh 'chmod +x *.sh'
-                        sh './*.sh'
+                        sh 'chmod +x welcome_note.sh'
+                        sh './welcome_note.sh'
                         echo '➕ Adding Jest and Supertest as dev dependencies...'
                         sh 'npm install --save-dev jest supertest jest-junit'
                         echo '🧪 Running Jest tests with JUnit XML report generation...'
@@ -99,8 +102,8 @@ pipeline {
                 stage('Integration_Test') {
                     steps {
                         sh 'npm ci'
-                        sh 'chmod +x *.sh'
-                        sh './*.sh'
+                        sh 'chmod +x welcome_note.sh'
+                        sh './welcome_note.sh'
                         echo '➕ Adding Jest and Supertest as dev dependencies...'
                         sh 'npm install --save-dev jest supertest jest-junit'
                         echo '🧪 Running Jest tests with JUnit XML report generation...'
@@ -126,8 +129,8 @@ pipeline {
             steps {
                 echo '🔍 Starting Lynis security scan...'
                 sh '''
-                    chmod +x *.sh
-                    ./*.sh
+                    chmod +x welcome_note.sh
+                    ./welcome_note.sh
                     mkdir -p artifacts/lynis
                     lynis audit system --quiet --report-file artifacts/lynis/lynis-report.log
                     lynis audit system | ansi2html > artifacts/lynis/lynis-report.html
@@ -148,8 +151,8 @@ pipeline {
                 script {
                     withSonarQubeEnv('sonarqube') {
                         sh '''
-                            chmod +x *.sh
-                            ./*.sh
+                            chmod +x welcome_note.sh
+                            ./welcome_note.sh
                         '''
                     }
                 }
@@ -160,8 +163,8 @@ pipeline {
             steps {
                 echo '🐳 Building Docker image...'
                 sh '''
-                    chmod +x *.sh
-                    ./*.sh
+                    chmod +x welcome_note.sh
+                    ./welcome_note.sh
                 '''
                 echo '✅ Docker image built successfully.'
                 script {
@@ -175,8 +178,8 @@ pipeline {
             steps {
                 echo '🔍 Starting Trivy scan...'
                 sh '''
-                    chmod +x *.sh
-                    ./*.sh
+                    chmod +x welcome_note.sh
+                    ./welcome_note.sh
                     trivy image --format json --output trivy-report.json --severity HIGH,CRITICAL ${params.DOCKERHUBREPO}:latest || true
                     trivy image --format html --output trivy-report.html --severity HIGH,CRITICAL ${params.DOCKERHUBREPO}:latest || true
                     trivy image --format sarif --output trivy-report.sarif --severity HIGH
@@ -236,27 +239,6 @@ pipeline {
 
     }
     post {
-        always {
-            echo '📝 Writing test results to file...'
-            // Disabled due to Jenkins script security sandbox restrictions on getRawBuild method
-            /*
-            script {
-                def testResults = currentBuild.rawBuild.getAction(hudson.tasks.junit.TestResultAction.class)
-                if (testResults) {
-                    def resultsFile = new File("${env.WORKSPACE}/test_results.txt")
-                    resultsFile.text = "Test Results:\n"
-                    testResults.getResult().getAllTests().each { test ->
-                        resultsFile.append("${test.fullName} - ${test.status}\n")
-                    }
-                    echo "Test results written to ${resultsFile.absolutePath}"
-                } else {
-                    echo 'No test results found.'
-                }
-            }
-            echo '✅ Test results written successfully.'
-            */
-            archiveArtifacts artifacts: '**/*', allowEmptyArchive: true    
-        }
         success {
             echo '🎉 Build completed successfully!'
             mail to: "${EMAIL_RECIPIENTS}",
