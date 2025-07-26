@@ -23,7 +23,7 @@ pipeline {
         ansiColor('xterm')
         timestamps()
         disableResume()
-        repositoryPolling('H 1 * * *')
+        repositoryPolling('H/3 * * * *')
         retry(0)
     
     }
@@ -115,10 +115,12 @@ pipeline {
                     }
                 }
             }
-            archiveArtifacts artifacts: 'junit.xml', allowEmptyArchive: true
-            junit 'junit.xml'
-            echo '📄 Publishing JUnit test report...'
-            echo '✅ All tests completed successfully.'
+            steps {
+                archiveArtifacts artifacts: 'junit.xml', allowEmptyArchive: true
+                junit 'junit.xml'
+                echo '📄 Publishing JUnit test report...'
+                echo '✅ All tests completed successfully.'
+            }
         }
         stage('Lynis_Scan') {
             steps {
@@ -132,13 +134,15 @@ pipeline {
                     '''
                 echo '✅ Lynis security scan completed.'
             }
-            archiveArtifacts artifacts: 'artifacts/lynis/lynis-report.log', allowEmptyArchive: true
-            archiveArtifacts artifacts: 'artifacts/lynis/lynis-report.html', allowEmptyArchive: true
-            junit 'artifacts/lynis/lynis-report.html'
-            junit 'artifacts/lynis/lynis-report.log'
-            echo '📄 Publishing Lynis report...'
-            echo '✅ Lynis report published successfully.'
-            error('Lynis scan completed with errors. Please review the report for details.')
+            steps {
+                archiveArtifacts artifacts: 'artifacts/lynis/lynis-report.log', allowEmptyArchive: true
+                archiveArtifacts artifacts: 'artifacts/lynis/lynis-report.html', allowEmptyArchive: true
+                junit 'artifacts/lynis/lynis-report.html'
+                junit 'artifacts/lynis/lynis-report.log'
+                echo '📄 Publishing Lynis report...'
+                echo '✅ Lynis report published successfully.'
+                error('Lynis scan completed with errors. Please review the report for details.')
+            }
         }
         stage('SonarQube_Scan') {
             steps {
