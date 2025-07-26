@@ -39,20 +39,6 @@ pipeline {
         EMAIL_RECIPIENTS = 'rajendra.daggubati09@gmail.com'
     }
     stages {
-        stage('Checkout_startup') {
-            steps {
-                echo '🔄 cloing the code'
-                checkout scm: [
-                    $class: 'GitSCM',
-                    branches: [[name: "${params.GIT_BRANCH}"]],
-                    userRemoteConfigs: [[
-                        url: "https://github.com/Rajendra0609/pipeline_startup.git",
-                        credentialsId: 'github_Rajendra0609',
-                        name: 'origin',
-                    ]],
-                ]
-            }
-        }
         stage('parallel_build') {
             parallel {
                 stage('Build') {
@@ -226,39 +212,47 @@ pipeline {
             }
         }
     }
-    post {
-        success {
-            echo '🎉 Build completed successfully!'
-            mail to: "${EMAIL_RECIPIENTS}",
-                subject: "Build Successful: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                body: """\
-The build was successful. Check the details at ${env.BUILD_URL}
+        post {
+    success {
+        echo 'Build & Deploy completed successfully!'
+        mail to: "${EMAIL_RECIPIENTS}",
+             subject: "SUCCESS: ${env.JOB_NAME} [#${env.BUILD_NUMBER}]",
+             body: """\
+The Jenkins Pipeline completed successfully.
+
 🔗 Pipeline URL: ${env.BUILD_URL}
 👷 Triggered by: ${currentBuild.getBuildCauses()[0].userName}
 
 View the full job here: ${env.BUILD_URL}
 """
-        }
-        failure {
-            script {
-                def log = currentBuild.rawBuild.getLog(100).join('\n')
-                def lastLines = log.split('\n').takeRight(100).join('\n')
-                def culprits = currentBuild.getBuildCauses().collect { it.userName }.join(', ')
-                def changeAuthor = currentBuild.changeSets.collect { cs ->
+    }
+
+    failure {
+        script {
+            def log = currentBuild.rawBuild.getLog(1000) // grab last 1000 lines, filter later
+            def lastLines = log.takeRight(50).join('\n')
+
+            def culprit = "Unknown"
+            def changeAuthor = "Unknown"
+
+            try {
+                // Git committer
+                changeAuthor = currentBuild.changeSets.collect { cs ->
                     cs.items.collect { it.author.fullName }
                 }.flatten().unique().join(', ')
-                def culprit = ''
-                try {
-                    culprit = currentBuild.getBuildCauses()[0].userName
-                } catch (e) {
-                    echo "Failed to determine author or trigger: ${e.message}"
-                }
-                mail to: "${EMAIL_RECIPIENTS}",
-                    subject: "FAILURE: ${env.JOB_NAME} [#${env.BUILD_NUMBER}]",
-                    body: """\
+
+                // Build trigger user
+                culprit = currentBuild.getBuildCauses()[0].userName
+            } catch (e) {
+                echo "Failed to determine author or trigger: ${e.message}"
+            }
+
+            mail to: "${EMAIL_RECIPIENTS}",
+                 subject: "FAILURE: ${env.JOB_NAME} [#${env.BUILD_NUMBER}]",
+                 body: """\
 The Jenkins Pipeline has FAILED ❌
 
-🔍 Failure Stage: See the Stage View or Blue Ocean for the exact stage
+🔍 Failure Stage: See the Stage View or Blue Ocean for exact stage
 👤 Git Committer(s): ${changeAuthor}
 🚀 Triggered by: ${culprit}
 🔗 Pipeline URL: ${env.BUILD_URL}
@@ -269,21 +263,51 @@ ${lastLines}
 --------------------------------------------------
 
 Please investigate the issue.
-For more details, visit the Jenkins job page: ${env.BUILD_URL}
-"""
-            }
-        }
-        unstable {
-            echo '⚠️ Build completed with warnings!'
-            mail to: "${EMAIL_RECIPIENTS}",
-                subject: "Build Unstable: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                body: """\
-The build completed with warnings. Check the details at ${env.BUILD_URL}
-🔗 Pipeline URL: ${env.BUILD_URL}
-👷 Triggered by: ${currentBuild.getBuildCauses()[0].userName}
-
-View the full job here: ${env.BUILD_URL}
 """
         }
     }
+
+    unstable {
+    script {
+        def log = currentBuild.rawBuild.getLog(1000)
+        def lastLines = log.takeRight(50).join('\n')
+
+        def culprit = "Unknown"
+        def changeAuthor = "Unknown"
+
+        try {
+            changeAuthor = currentBuild.changeSets.collect { cs ->
+                cs.items.collect { it.author.fullName }
+            }.flatten().unique().join(', ')
+
+            culprit = currentBuild.getBuildCauses()[0].userName
+        } catch (e) {
+            echo "Failed to determine author or trigger: ${e.message}"
+        }
+
+        mail to: "${EMAIL_RECIPIENTS}",
+             subject: "UNSTABLE: ${env.JOB_NAME} [#${env.BUILD_NUMBER}]",
+             body: """\
+The Jenkins Pipeline is UNSTABLE ⚠️
+
+🔍 Potential Failure Stage: See the Stage View or Blue Ocean for exact stage
+👤 Git Committer(s): ${changeAuthor}
+🚀 Triggered by: ${culprit}
+🔗 Pipeline URL: ${env.BUILD_URL}
+
+📄 Last 50 lines of console output:
+--------------------------------------------------
+${lastLines}
+--------------------------------------------------
+
+Please investigate the warning.
+"""
+    }
+}
+
+    always {
+        cleanWs()
+        echo 'Workspace cleaned'
+    }
+}
 }
