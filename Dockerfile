@@ -1,6 +1,6 @@
 FROM node:latest AS builder
 LABEL maintainer="Raja"
-COPY weather-app_test /opt/weather_app
+COPY * /opt/weather_app
 WORKDIR /opt/weather_app
 RUN npm install
 
