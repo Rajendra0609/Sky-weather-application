@@ -1,0 +1,18 @@
+{
+  "name": "weather-app_test",
+  "version": "1.0.0",
+  "description": "A simple weather app for testing",
+  "main": "index.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "^27.0.0",
+    "supertest": "^6.0.0"
+  },
+  "dependencies": {
+    "express": "^4.17.1"
+  }
+}
+

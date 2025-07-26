@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Weather Forecast</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body, html {
+      height: 100%;
+      font-family: Arial, sans-serif;
+    }
+
+    .background {
+      background-image: 
+        linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)),
+        url('https://images.unsplash.com/photo-1501630834273-4b5604d2ee31?auto=format&fit=crop&w=1920&q=80');
+      background-size: cover;
+      background-position: center;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: white;
+      padding: 20px;
+    }
+
+    .content {
+      background: rgba(0, 0, 0, 0.5);
+      padding: 30px;
+      border-radius: 10px;
+    }
+
+    input, button {
+      padding: 10px;
+      font-size: 16px;
+      margin: 10px 5px;
+      border-radius: 5px;
+      border: none;
+    }
+
+    input {
+      width: 220px;
+    }
+
+    button {
+      background-color: #2196F3;
+      color: white;
+      cursor: pointer;
+    }
+
+    #weather-results {
+      margin-top: 20px;
+      background: rgba(255, 255, 255, 0.2);
+      padding: 10px;
+      border-radius: 8px;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="background">
+    <div class="content">
+      <h1>Weather Forecast for Next 2 Hours</h1>
+      <div>
+        <input type="text" id="city" placeholder="Enter city" />
+        <button onclick="getWeather()">Get Forecast</button>
+      </div>
+      <div id="weather-results"></div>
+    </div>
+  </div>
+
+  <script>
+    async function getWeather() {
+      const city = document.getElementById('city').value || 'London';
+      const response = await fetch(`/api/weather?city=${encodeURIComponent(city)}`);
+      const data = await response.json();
+
+      let resultHTML = '<ul>';
+      data.forEach(forecast => {
+        resultHTML += `<li>${forecast.time} - ${forecast.temperature}°C - ${forecast.weather}</li>`;
+      });
+      resultHTML += '</ul>';
+      document.getElementById('weather-results').innerHTML = resultHTML;
+    }
+  </script>
+
+</body>
+</html>
+
