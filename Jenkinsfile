@@ -20,10 +20,8 @@ pipeline {
         disableConcurrentBuilds()
         timeout(time: 1, unit: 'HOURS')
         skipDefaultCheckout()
-        ansiColor('xterm')
         timestamps()
         disableResume()
-        repositoryPolling('H/3 * * * *')
         retry(0)
     
     }
@@ -115,11 +113,13 @@ pipeline {
                     }
                 }
             }
-            steps {
-                archiveArtifacts artifacts: 'junit.xml', allowEmptyArchive: true
-                junit 'junit.xml'
-                echo '📄 Publishing JUnit test report...'
-                echo '✅ All tests completed successfully.'
+            post {
+                always {
+                    archiveArtifacts artifacts: 'junit.xml', allowEmptyArchive: true
+                    junit 'junit.xml'
+                    echo '📄 Publishing JUnit test report...'
+                    echo '✅ All tests completed successfully.'
+                }
             }
         }
         stage('Lynis_Scan') {
@@ -133,8 +133,6 @@ pipeline {
                     lynis audit system | ansi2html > artifacts/lynis/lynis-report.html
                     '''
                 echo '✅ Lynis security scan completed.'
-            }
-            steps {
                 archiveArtifacts artifacts: 'artifacts/lynis/lynis-report.log', allowEmptyArchive: true
                 archiveArtifacts artifacts: 'artifacts/lynis/lynis-report.html', allowEmptyArchive: true
                 junit 'artifacts/lynis/lynis-report.html'
@@ -166,9 +164,10 @@ pipeline {
                     ./*.sh
                 '''
                 echo '✅ Docker image built successfully.'
-                dockerImage = docker.image("${params.DOCKERHUBREPO}:latest")
-                dockerTag = "${params.DOCKERHUBREPO}:${params.VERSION}"
-                dockerTag = "${params.DOCKERHUBREPO}:latest"
+                script {
+                    dockerImage = docker.image("${params.DOCKERHUBREPO}:latest")
+                    dockerTag = "${params.DOCKERHUBREPO}:${params.VERSION}"
+                }
                 echo '✅ Docker image built successfully.'
             }
         }
