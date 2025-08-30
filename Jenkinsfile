@@ -145,20 +145,22 @@ agent {
         }
 
         stage('SonarQube_Scan') {
-            script {
+    steps {
+        script {
             withSonarQubeEnv('sonar') {
                 sh '''
                     chmod +x welcome_note.sh
                     ./welcome_note.sh
-                    $SCANNER_HOME/bin/sonar-scanner \
+                    ${SCANNER_HOME}/bin/sonar-scanner \
                     -Dsonar.projectKey=Sky-weather-application \
-                    -Dsonar.sources=.   # <-- Update this based on actual structure
+                    -Dsonar.sources=.
                 '''
-                    }
-                 echo '✅ SonarQube scan completed.'
-                }
-               
+            }
+            echo '✅ SonarQube scan completed.'
         }
+    }
+}
+
 
         stage('Docker_Build') {
             steps {
@@ -303,5 +305,3 @@ Please investigate the warning.
         }
     }
 }
-
-
