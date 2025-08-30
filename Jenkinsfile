@@ -155,8 +155,9 @@ agent {
                     -Dsonar.sources=.   # <-- Update this based on actual structure
                 '''
                     }
+                 echo '✅ SonarQube scan completed.'
                 }
-                echo '✅ SonarQube scan completed.'
+               
         }
 
         stage('Docker_Build') {
@@ -302,4 +303,5 @@ Please investigate the warning.
         }
     }
 }
+
 
