@@ -135,7 +135,7 @@ agent {
             }
         }
 
-        sstage('SonarQube_Scan') {
+        stage('SonarQube_Scan') {
             steps {
                 echo '🔍 Starting SonarQube scan...'
                 script {
@@ -296,3 +296,4 @@ Please investigate the warning.
         }
     }
 }
+
