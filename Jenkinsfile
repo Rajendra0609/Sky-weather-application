@@ -8,6 +8,7 @@ pipeline {
     tools {
         nodejs 'nodejs'
         maven 'maven'
+        docker 'docker'
     }
 
     triggers {
@@ -296,6 +297,7 @@ Please investigate the warning.
         }
     }
 }
+
 
 
 
