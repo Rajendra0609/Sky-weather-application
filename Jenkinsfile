@@ -287,15 +287,12 @@ Please investigate the warning.
         }
 
         always {
-            script {
-                node('kube_m') {
-                    cleanWs()
-                }
-            }
+            cleanWs()
             echo '🧹 Workspace cleaned'
         }
     }
 }
+
 
 
 
