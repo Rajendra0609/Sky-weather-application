@@ -10,7 +10,7 @@ agent {
 
     tools {
         nodejs 'nodejs'
-        maven 'maven'
+        //maven 'maven'
     }
 
     triggers {
@@ -153,7 +153,7 @@ agent {
                     ./welcome_note.sh
                     ${SCANNER_HOME}/bin/sonar-scanner \
                     -Dsonar.projectKey=Sky-weather-application \
-                    -Dsonar.sources=.
+                    -Dsonar.sources=backend,frontend,my-shared-library,welcome_note.sh
                 '''
             }
             echo '✅ SonarQube scan completed.'
@@ -305,3 +305,4 @@ Please investigate the warning.
         }
     }
 }
+
