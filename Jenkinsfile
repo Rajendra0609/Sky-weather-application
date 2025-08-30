@@ -1,8 +1,8 @@
 pipeline {
     agent {
         kubernetes {
-            label 'kube_m' // This must match the name of your pod template
-            defaultContainer 'jnlp1' // This matches the container name in your pod template
+            label 'kube_s' // This must match the name of your pod template
+            defaultContainer 'jnlp' // This matches the container name in your pod template
         }
     }
     tools {
@@ -296,6 +296,7 @@ Please investigate the warning.
         }
     }
 }
+
 
 
 
