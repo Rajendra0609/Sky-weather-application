@@ -157,7 +157,6 @@ agent {
                     }
                 }
                 echo '✅ SonarQube scan completed.'
-            }
         }
 
         stage('Docker_Build') {
@@ -303,3 +302,4 @@ Please investigate the warning.
         }
     }
 }
+
