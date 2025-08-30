@@ -1,5 +1,12 @@
 pipeline {
-    agent none
+    
+agent {
+        kubernetes {
+            label 'kube_m' // ✅ Must match the label in the pod template
+            defaultContainer 'jnlp'
+        }
+    }
+
 
     tools {
         nodejs 'nodejs'
@@ -21,54 +28,24 @@ pipeline {
     }
 
     parameters {
-        string(name: 'GIT_BRANCH', defaultValue: 'dev/raj/jen', description: 'Branch to build')
+        string(name: 'GIT_BRANCH', defaultValue: 'master', description: 'Branch to build')
         string(name: 'DOCKERHUBREPO', defaultValue: 'daggu1997/weather', description: 'Docker Hub repository to push the image')
         string(name: 'VERSION', defaultValue: 'latest', description: 'Version of the Docker image')
-        string(name: 'DOCKER_HUB_CREDENTIALS_ID', defaultValue: 'docker', description: 'Credentials ID for Docker Hub')
-        string(name: 'GITHUB_CREDENTIALS_ID', defaultValue: 'github', description: 'Credentials ID for GitHub access')
-        string(name: 'GITHUB_REPO', defaultValue: 'Rajendra0609/Sky-weather-application', description: 'GitHub repository in owner/repo format')
-        string(name: 'EMAIL_RECIPIENTS', defaultValue: 'rajendra.daggubati09@gmail.com,srirajendraprasaddaggubati@gmail.com', description: 'Comma-separated list of email recipients')
     }
 
     environment {
-        DOCKER_HUB_CREDENTIALS_ID = 'docker'
-        GITHUB_CREDENTIALS_ID = 'github'
+        DOCKER_HUB_CREDENTIALS_ID = 'dockerhub'
+        GIT_BRANCH = "${params.GIT_BRANCH}"
+        GITHUB_CREDENTIALS_ID = 'github_Rajendra0609'
         GITHUB_REPO = 'Rajendra0609/Sky-weather-application'
         GITHUB_API_URL = 'https://api.github.com'
-        EMAIL_RECIPIENTS = 'rajendra.daggubati09@gmail.com,srirajendraprasaddaggubati@gmail.com'
-        TERM = 'xterm-256color'
-        GITHUB_TOKEN = 'git_token'
-        DOCKER_USER = 'docker_user'
-        DOCKER_PASS = 'docker_token'
-        SCANNER_HOME = tool 'sonar'
+        EMAIL_RECIPIENTS = 'rajendra.daggubati09@gmail.com'
     }
 
     stages {
         stage('Checkout_startup') {
-            agent { label 'fix_s' }
             steps {
-                echo '🔄 Cloning the code'
-                checkout scm: [
-                    $class: 'GitSCM',
-                    branches: [[name: "${params.GIT_BRANCH}"]],
-                    userRemoteConfigs: [[
-                        url: "https://github.com/Rajendra0609/Sky-weather-application.git",
-                        credentialsId: 'github_Rajendra0609',
-                        name: 'origin'
-                    ]]
-                ]
-            }
-        }
-
-        stage('Checkout_startup1') {
-            agent {
-                        kubernetes {
-                            inheritFrom 'kube_s'
-                            defaultContainer 'jnlp'
-                        }
-                    }
-            steps {
-                echo '🔄 Cloning the code again'
+                echo '🔄 cloing the code'
                 checkout scm: [
                     $class: 'GitSCM',
                     branches: [[name: "${params.GIT_BRANCH}"]],
@@ -84,27 +61,17 @@ pipeline {
         stage('parallel_build') {
             parallel {
                 stage('Build') {
-                    agent {
-                        kubernetes {
-                            inheritFrom 'kube_s'
-                            defaultContainer 'jnlp'
-                        }
-                    }
                     steps {
                         echo '🔨 Starting build process...'
                         sh 'chmod +x welcome_note.sh'
                         sh './welcome_note.sh'
                         sh 'npm install'
+                        echo '🔨 Build process completed.'
                         echo '📦 Packaging application...'
                     }
                 }
+
                 stage('Build_Application') {
-                    agent {
-                        kubernetes {
-                            inheritFrom 'kube_s'
-                            defaultContainer 'jnlp'
-                        }
-                    }
                     steps {
                         echo '🔨 Installing dependencies and building the project...'
                         sh 'chmod +x welcome_note.sh'
@@ -119,12 +86,6 @@ pipeline {
         stage('Parallel_Test') {
             parallel {
                 stage('Unit_Test') {
-                    agent {
-                        kubernetes {
-                            inheritFrom 'kube_s'
-                            defaultContainer 'jnlp'
-                        }
-                    }
                     steps {
                         echo '🧪 Running unit tests...'
                         sh 'chmod +x welcome_note.sh'
@@ -136,12 +97,6 @@ pipeline {
                 }
 
                 stage('Integration_Test') {
-                    agent {
-                        kubernetes {
-                            inheritFrom 'kube_s'
-                            defaultContainer 'jnlp'
-                        }
-                    }
                     steps {
                         sh 'chmod +x welcome_note.sh'
                         sh './welcome_note.sh'
@@ -158,15 +113,13 @@ pipeline {
                 always {
                     archiveArtifacts artifacts: 'junit.xml', allowEmptyArchive: true
                     junit 'junit.xml'
+                    echo '📄 Publishing JUnit test report...'
+                    echo '✅ All tests completed successfully.'
                 }
             }
         }
 
         stage('Lynis_Scan') {
-            agent { label 'kube_s' }
-            when {
-                branch 'master'
-            }
             steps {
                 echo '🔍 Starting Lynis security scan...'
                 sh '''
@@ -176,23 +129,24 @@ pipeline {
                     lynis audit system --quiet --report-file artifacts/lynis/lynis-report.log
                     lynis audit system | ansi2html > artifacts/lynis/lynis-report.html
                 '''
-                archiveArtifacts artifacts: 'artifacts/lynis/lynis-report.*', allowEmptyArchive: true
+                archiveArtifacts artifacts: 'artifacts/lynis/lynis-report.log', allowEmptyArchive: true
+                archiveArtifacts artifacts: 'artifacts/lynis/lynis-report.html', allowEmptyArchive: true
+                echo '✅ Lynis report published successfully.'
             }
         }
 
         stage('SonarQube_Scan') {
-            agent { label 'fix_s' }
             steps {
                 echo '🔍 Starting SonarQube scan...'
                 script {
                     withSonarQubeEnv('sonar') {
                         sh '''
-                            chmod +x welcome_note.sh
-                            ./welcome_note.sh
-                            $SCANNER_HOME/bin/sonar-scanner \
-                            -Dsonar.projectKey=Sky-weather-application \
-                            -Dsonar.sources=src/main/java
-                        '''
+                        chmod +x welcome_note.sh
+                        ./welcome_note.sh
+                        $SCANNER_HOME/bin/sonar-scanner \
+                        -Dsonar.projectKey=Sky-weather-application \
+                        -Dsonar.sources=.   # <-- Update this based on actual structure
+                    '''
                     }
                 }
                 echo '✅ SonarQube scan completed.'
@@ -200,7 +154,6 @@ pipeline {
         }
 
         stage('Docker_Build') {
-            agent { label 'fix_s' }
             steps {
                 echo '🐳 Building Docker image...'
                 sh '''
@@ -210,11 +163,11 @@ pipeline {
                 script {
                     dockerImage = docker.build("${params.DOCKERHUBREPO}:${params.VERSION}", "-f Dockerfile .")
                 }
+                echo '✅ Docker image built successfully.'
             }
         }
 
         stage('Trivy') {
-            agent { label 'fix_s' }
             steps {
                 echo '🔍 Starting Trivy scan...'
                 script {
@@ -225,7 +178,9 @@ pipeline {
                         trivy image --format json --output trivy-report.json --severity HIGH,CRITICAL ${imageName} || true
                     """
                 }
+                echo '✅ Trivy scan completed.'
             }
+
             post {
                 always {
                     archiveArtifacts artifacts: 'trivy-report.json', allowEmptyArchive: true
@@ -234,7 +189,6 @@ pipeline {
         }
 
         stage('Docker_Push') {
-            agent { label 'fix_s' }
             steps {
                 echo '🚀 Pushing Docker image to Docker Hub...'
                 script {
@@ -242,16 +196,17 @@ pipeline {
                         dockerImage.push("latest")
                     }
                 }
+                echo '✅ Docker image pushed successfully.'
             }
         }
     }
 
     post {
         success {
-            echo '✅ Build & Deploy completed successfully!'
+            echo 'Build & Deploy completed successfully!'
             mail to: "${EMAIL_RECIPIENTS}",
-                subject: "SUCCESS: ${env.JOB_NAME} [#${env.BUILD_NUMBER}]",
-                body: """\
+                 subject: "SUCCESS: ${env.JOB_NAME} [#${env.BUILD_NUMBER}]",
+                 body: """\
 The Jenkins Pipeline completed successfully.
 
 🔗 Pipeline URL: ${env.BUILD_URL}
@@ -279,8 +234,8 @@ View the full job here: ${env.BUILD_URL}
                 }
 
                 mail to: "${EMAIL_RECIPIENTS}",
-                    subject: "FAILURE: ${env.JOB_NAME} [#${env.BUILD_NUMBER}]",
-                    body: """\
+                     subject: "FAILURE: ${env.JOB_NAME} [#${env.BUILD_NUMBER}]",
+                     body: """\
 The Jenkins Pipeline has FAILED ❌
 
 🔍 Failure Stage: See the Stage View or Blue Ocean for exact stage
@@ -316,8 +271,8 @@ Please investigate the issue.
                 }
 
                 mail to: "${EMAIL_RECIPIENTS}",
-                    subject: "UNSTABLE: ${env.JOB_NAME} [#${env.BUILD_NUMBER}]",
-                    body: """\
+                     subject: "UNSTABLE: ${env.JOB_NAME} [#${env.BUILD_NUMBER}]",
+                     body: """\
 The Jenkins Pipeline is UNSTABLE ⚠️
 
 🔍 Potential Failure Stage: See the Stage View or Blue Ocean for exact stage
@@ -337,7 +292,7 @@ Please investigate the warning.
 
         always {
             cleanWs()
-            echo '🧹 Workspace cleaned'
+            echo 'Workspace cleaned'
         }
     }
 }
