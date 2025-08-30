@@ -1,10 +1,12 @@
 pipeline {
-    agent {
+    
+agent {
         kubernetes {
-            inheritFrom 'kube_l' // This must match the name of your pod template
-            defaultContainer 'jnlp' // This matches the container name in your pod template
+            label 'kube_l' // ✅ Must match the label in the pod template
+            defaultContainer 'jnlp'
         }
     }
+
     tools {
         nodejs 'nodejs'
         maven 'maven'
@@ -292,6 +294,7 @@ Please investigate the warning.
         }
     }
 }
+
 
 
 
