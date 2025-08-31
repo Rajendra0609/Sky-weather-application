@@ -10,7 +10,7 @@ agent {
 
     tools {
         nodejs 'nodejs'
-        maven 'maven'
+        //maven 'maven'
     }
 
     triggers {
@@ -31,15 +31,25 @@ agent {
         string(name: 'GIT_BRANCH', defaultValue: 'master', description: 'Branch to build')
         string(name: 'DOCKERHUBREPO', defaultValue: 'daggu1997/weather', description: 'Docker Hub repository to push the image')
         string(name: 'VERSION', defaultValue: 'latest', description: 'Version of the Docker image')
+        string(name: 'DOCKER_HUB_CREDENTIALS_ID', defaultValue: 'docker', description: 'Credentials ID for Docker Hub')
+        string(name: 'GITHUB_CREDENTIALS_ID', defaultValue: 'github', description: 'Credentials ID for GitHub access')
+        string(name: 'GITHUB_REPO', defaultValue: 'Rajendra0609/Sky-weather-application', description: 'GitHub repository in owner/repo format')
+        string(name: 'EMAIL_RECIPIENTS', defaultValue: 'rajendra.daggubati09@gmail.com,srirajendraprasaddaggubati@gmail.com', description: 'Comma-separated list of email recipients')
     }
 
+
     environment {
-        DOCKER_HUB_CREDENTIALS_ID = 'dockerhub'
+        DOCKER_HUB_CREDENTIALS_ID = 'docker'
         GIT_BRANCH = "${params.GIT_BRANCH}"
         GITHUB_CREDENTIALS_ID = 'github_Rajendra0609'
         GITHUB_REPO = 'Rajendra0609/Sky-weather-application'
         GITHUB_API_URL = 'https://api.github.com'
-        EMAIL_RECIPIENTS = 'rajendra.daggubati09@gmail.com'
+        EMAIL_RECIPIENTS = 'rajendra.daggubati09@gmail.com,srirajendraprasaddaggubati@gmail.com'
+        TERM = 'xterm-256color'
+        GITHUB_TOKEN = 'git_token'
+        DOCKER_USER = 'docker_user'
+        DOCKER_PASS = 'docker_token'
+        SCANNER_HOME = tool 'sonar'
     }
 
     stages {
@@ -136,22 +146,24 @@ agent {
         }
 
         stage('SonarQube_Scan') {
-            steps {
-                echo '🔍 Starting SonarQube scan...'
-                script {
-                    withSonarQubeEnv('sonar') {
-                        sh '''
-                        chmod +x welcome_note.sh
-                        ./welcome_note.sh
-                        $SCANNER_HOME/bin/sonar-scanner \
-                        -Dsonar.projectKey=Sky-weather-application \
-                        -Dsonar.sources=.   # <-- Update this based on actual structure
-                    '''
-                    }
-                }
-                echo '✅ SonarQube scan completed.'
+          steps {
+            script {
+            withSonarQubeEnv('sonar') {
+                sh '''
+                    chmod +x welcome_note.sh
+                    ./welcome_note.sh
+                    ${SCANNER_HOME}/bin/sonar-scanner \
+                    -Dsonar.projectKey=Sky-weather-application \
+                    -Dsonar.sources=backend,frontend,my-shared-library,welcome_note.sh
+                '''
             }
+            echo '✅ SonarQube scan completed.'
         }
+
+        }
+        }
+
+
 
         stage('Docker_Build') {
             steps {
@@ -296,3 +308,7 @@ Please investigate the warning.
         }
     }
 }
+
+
+
+
