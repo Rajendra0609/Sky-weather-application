@@ -37,6 +37,7 @@ agent {
         string(name: 'EMAIL_RECIPIENTS', defaultValue: 'rajendra.daggubati09@gmail.com,srirajendraprasaddaggubati@gmail.com', description: 'Comma-separated list of email recipients')
     }
 
+
     environment {
         DOCKER_HUB_CREDENTIALS_ID = 'docker'
         GIT_BRANCH = "${params.GIT_BRANCH}"
@@ -145,8 +146,8 @@ agent {
         }
 
         stage('SonarQube_Scan') {
-    steps {
-        script {
+          steps {
+            script {
             withSonarQubeEnv('sonar') {
                 sh '''
                     chmod +x welcome_note.sh
@@ -158,8 +159,10 @@ agent {
             }
             echo '✅ SonarQube scan completed.'
         }
-    }
-}
+
+        }
+        }
+
 
 
         stage('Docker_Build') {
