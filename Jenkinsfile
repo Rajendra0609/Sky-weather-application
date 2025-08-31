@@ -2,7 +2,7 @@ pipeline {
     
 agent {
         kubernetes {
-            label 'kube_m' // ✅ Must match the label in the pod template
+            label 'kube_l' // ✅ Must match the label in the pod template
             defaultContainer 'jnlp'
         }
     }
@@ -305,4 +305,5 @@ Please investigate the warning.
         }
     }
 }
+
 
