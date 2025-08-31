@@ -38,7 +38,7 @@ agent {
     }
 
     environment {
-        DOCKER_HUB_CREDENTIALS_ID = 'dockerhub'
+        DOCKER_HUB_CREDENTIALS_ID = 'docker'
         GIT_BRANCH = "${params.GIT_BRANCH}"
         GITHUB_CREDENTIALS_ID = 'github_Rajendra0609'
         GITHUB_REPO = 'Rajendra0609/Sky-weather-application'
@@ -305,6 +305,7 @@ Please investigate the warning.
         }
     }
 }
+
 
 
 
