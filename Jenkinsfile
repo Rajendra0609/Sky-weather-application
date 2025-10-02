@@ -1,12 +1,11 @@
-@Library('my-shared-library') _
-
 pipeline {
 
 agent {
-        kubernetes {
-            label 'kube_m' // ✅ Must match the label in the pod template
-            defaultContainer 'jnlp'
-        }
+       label 'fix_s'
+       // kubernetes {
+            //label 'kube_m' // ✅ Must match the label in the pod template
+           // defaultContainer 'jnlp'
+        //}
     }
 
 
@@ -30,7 +29,7 @@ agent {
     }
 
     parameters {
-        string(name: 'GIT_BRANCH', defaultValue: 'master', description: 'Branch to build')
+        string(name: 'GIT_BRANCH', defaultValue: 'dev_jen', description: 'Branch to build')
         string(name: 'DOCKERHUBREPO', defaultValue: 'daggu1997/weather', description: 'Docker Hub repository to push the image')
         string(name: 'VERSION', defaultValue: 'latest', description: 'Version of the Docker image')
         string(name: 'DOCKER_HUB_CREDENTIALS_ID', defaultValue: 'docker', description: 'Credentials ID for Docker Hub')
@@ -79,8 +78,7 @@ agent {
                     steps {
                         cache(path: '.npm', key: 'npm-cache-${GIT_COMMIT}') {
                             echo '🔨 Starting build process...'
-                            sh 'chmod +x welcome_note.sh'
-                            sh './welcome_note.sh'
+                            sh './usr/local/bin/node_status.sh'
                             sh 'npm install'
                             echo '🔨 Build process completed.'
                             echo '📦 Packaging application...'
@@ -92,8 +90,7 @@ agent {
                     steps {
                         cache(path: '.npm', key: 'npm-cache-${GIT_COMMIT}') {
                             echo '🔨 Installing dependencies and building the project...'
-                            sh 'chmod +x welcome_note.sh'
-                            sh './welcome_note.sh'
+                            sh './usr/local/bin/node_status.sh'
                             sh 'npm install'
                             echo '✅ Build completed.'
                         }
@@ -114,8 +111,7 @@ agent {
                     stage('Test') {
                         steps {
                             script {
-                                sh 'chmod +x welcome_note.sh'
-                                sh './welcome_note.sh'
+                                sh './usr/local/bin/node_status.sh'
                                 sh 'npm install --save-dev jest supertest jest-junit'
                                 if (TEST_TYPE == 'unit') {
                                     sh 'npx jest --ci --reporters=default --reporters=jest-junit --coverage'
@@ -141,8 +137,7 @@ agent {
             steps {
                 echo '🔍 Starting Lynis security scan...'
                 sh '''
-                    chmod +x welcome_note.sh
-                    ./welcome_note.sh
+                    ./usr/local/bin/node_status.sh
                     mkdir -p artifacts/lynis
                     lynis audit system --quiet --report-file artifacts/lynis/lynis-report.log
                     lynis audit system | ansi2html > artifacts/lynis/lynis-report.html
@@ -158,8 +153,7 @@ agent {
             script {
             withSonarQubeEnv('sonar') {
                 sh '''
-                    chmod +x welcome_note.sh
-                    ./welcome_note.sh
+                    ./usr/local/bin/node_status.sh
                     ${SCANNER_HOME}/bin/sonar-scanner \
                     -Dsonar.projectKey=Sky-weather-application \
                     -Dsonar.sources=backend,frontend,my-shared-library,welcome_note.sh \
@@ -175,8 +169,7 @@ agent {
             steps {
                 echo '🐳 Building Docker image...'
                 sh '''
-                    chmod +x welcome_note.sh
-                    ./welcome_note.sh
+                    ./usr/local/bin/node_status.sh
                 '''
                 script {
                     dockerImage = docker.build("${params.DOCKERHUBREPO}:${IMAGE_TAG}", "-f Dockerfile .")
@@ -189,8 +182,6 @@ agent {
             steps {
                 echo '🔍 Starting DAST scan with OWASP ZAP...'
                 sh '''
-                    chmod +x welcome_note.sh
-                    ./welcome_note.sh
                     docker run --rm -v $(pwd):/zap/wrk:rw -t owasp/zap2docker-stable zap-baseline.py -t http://localhost:3000 -r zap-report.html || true
                 '''
                 archiveArtifacts artifacts: 'zap-report.html', allowEmptyArchive: true
@@ -204,8 +195,6 @@ agent {
                 script {
                     def imageName = "${params.DOCKERHUBREPO}:${IMAGE_TAG}"
                     sh """
-                        chmod +x welcome_note.sh
-                        ./welcome_note.sh
                         trivy image --format json --output trivy-report.json --severity HIGH,CRITICAL ${imageName} || true
                     """
                 }
@@ -235,7 +224,7 @@ agent {
         stage('Deploy_Staging') {
             steps {
                 echo '🚀 Deploying to Staging...'
-                sh 'kubectl apply -f k8s/staging.yaml'
+                //sh 'kubectl apply -f k8s/staging.yaml'
                 echo '✅ Deployed to Staging.'
             }
         }
@@ -244,7 +233,7 @@ agent {
             steps {
                 input message: 'Deploy to Production?'
                 echo '🚀 Deploying to Production...'
-                sh 'kubectl apply -f k8s/prod.yaml'
+                //sh 'kubectl apply -f k8s/prod.yaml'
                 echo '✅ Deployed to Production.'
             }
         }
