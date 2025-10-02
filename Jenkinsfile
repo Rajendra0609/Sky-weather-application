@@ -1,5 +1,7 @@
+@Library('my-shared-library') _
+
 pipeline {
-    
+
 agent {
         kubernetes {
             label 'kube_m' // ✅ Must match the label in the pod template
@@ -50,6 +52,9 @@ agent {
         DOCKER_USER = 'docker_user'
         DOCKER_PASS = 'docker_token'
         SCANNER_HOME = tool 'sonar'
+        GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+        BUILD_DATE = sh(script: 'date +%Y%m%d-%H%M%S', returnStdout: true).trim()
+        IMAGE_TAG = "${GIT_COMMIT}-${BUILD_DATE}"
     }
 
     stages {
@@ -72,59 +77,62 @@ agent {
             parallel {
                 stage('Build') {
                     steps {
-                        echo '🔨 Starting build process...'
-                        sh 'chmod +x welcome_note.sh'
-                        sh './welcome_note.sh'
-                        sh 'npm install'
-                        echo '🔨 Build process completed.'
-                        echo '📦 Packaging application...'
+                        cache(path: '.npm', key: 'npm-cache-${GIT_COMMIT}') {
+                            echo '🔨 Starting build process...'
+                            sh 'chmod +x welcome_note.sh'
+                            sh './welcome_note.sh'
+                            sh 'npm install'
+                            echo '🔨 Build process completed.'
+                            echo '📦 Packaging application...'
+                        }
                     }
                 }
 
                 stage('Build_Application') {
                     steps {
-                        echo '🔨 Installing dependencies and building the project...'
-                        sh 'chmod +x welcome_note.sh'
-                        sh './welcome_note.sh'
-                        sh 'npm install'
-                        echo '✅ Build completed.'
+                        cache(path: '.npm', key: 'npm-cache-${GIT_COMMIT}') {
+                            echo '🔨 Installing dependencies and building the project...'
+                            sh 'chmod +x welcome_note.sh'
+                            sh './welcome_note.sh'
+                            sh 'npm install'
+                            echo '✅ Build completed.'
+                        }
                     }
                 }
             }
         }
 
-        stage('Parallel_Test') {
-            parallel {
-                stage('Unit_Test') {
-                    steps {
-                        echo '🧪 Running unit tests...'
-                        sh 'chmod +x welcome_note.sh'
-                        sh './welcome_note.sh'
-                        sh 'npm install --save-dev jest supertest jest-junit'
-                        sh 'npx jest --ci --reporters=default --reporters=jest-junit'
-                        echo '✅ Unit tests completed successfully.'
+        stage('Matrix_Test') {
+            matrix {
+                axes {
+                    axis {
+                        name 'TEST_TYPE'
+                        values 'unit', 'integration'
                     }
                 }
-
-                stage('Integration_Test') {
-                    steps {
-                        sh 'chmod +x welcome_note.sh'
-                        sh './welcome_note.sh'
-                        sh 'npm install --save-dev jest supertest jest-junit'
-                        sh 'npx jest --ci --reporters=default --reporters=jest-junit'
-                        junit 'junit.xml'
-                        sh 'python3 backend/test_weather.py || true'
-                        echo '✅ Integration tests completed successfully.'
+                stages {
+                    stage('Test') {
+                        steps {
+                            script {
+                                sh 'chmod +x welcome_note.sh'
+                                sh './welcome_note.sh'
+                                sh 'npm install --save-dev jest supertest jest-junit'
+                                if (TEST_TYPE == 'unit') {
+                                    sh 'npx jest --ci --reporters=default --reporters=jest-junit --coverage'
+                                } else {
+                                    sh 'npx jest --ci --reporters=default --reporters=jest-junit'
+                                    sh 'python3 backend/test_weather.py || true'
+                                }
+                            }
+                        }
                     }
                 }
             }
-
             post {
                 always {
-                    archiveArtifacts artifacts: 'junit.xml', allowEmptyArchive: true
                     junit 'junit.xml'
-                    echo '📄 Publishing JUnit test report...'
-                    echo '✅ All tests completed successfully.'
+                    publishHTML(target: [allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true, reportDir: 'coverage/lcov-report', reportFiles: 'index.html', reportName: 'Code Coverage Report'])
+                    echo '📄 Publishing JUnit and Coverage reports...'
                 }
             }
         }
@@ -154,7 +162,8 @@ agent {
                     ./welcome_note.sh
                     ${SCANNER_HOME}/bin/sonar-scanner \
                     -Dsonar.projectKey=Sky-weather-application \
-                    -Dsonar.sources=backend,frontend,my-shared-library,welcome_note.sh
+                    -Dsonar.sources=backend,frontend,my-shared-library,welcome_note.sh \
+                    -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
                 '''
             }
             echo '✅ SonarQube scan completed.'
@@ -162,9 +171,6 @@ agent {
 
         }
         }
-
-
-
         stage('Docker_Build') {
             steps {
                 echo '🐳 Building Docker image...'
@@ -173,9 +179,22 @@ agent {
                     ./welcome_note.sh
                 '''
                 script {
-                    dockerImage = docker.build("${params.DOCKERHUBREPO}:${params.VERSION}", "-f Dockerfile .")
+                    dockerImage = docker.build("${params.DOCKERHUBREPO}:${IMAGE_TAG}", "-f Dockerfile .")
                 }
                 echo '✅ Docker image built successfully.'
+            }
+        }
+
+        stage('DAST_Scan') {
+            steps {
+                echo '🔍 Starting DAST scan with OWASP ZAP...'
+                sh '''
+                    chmod +x welcome_note.sh
+                    ./welcome_note.sh
+                    docker run --rm -v $(pwd):/zap/wrk:rw -t owasp/zap2docker-stable zap-baseline.py -t http://localhost:3000 -r zap-report.html || true
+                '''
+                archiveArtifacts artifacts: 'zap-report.html', allowEmptyArchive: true
+                echo '✅ DAST scan completed.'
             }
         }
 
@@ -183,7 +202,7 @@ agent {
             steps {
                 echo '🔍 Starting Trivy scan...'
                 script {
-                    def imageName = "${params.DOCKERHUBREPO}:${params.VERSION}"
+                    def imageName = "${params.DOCKERHUBREPO}:${IMAGE_TAG}"
                     sh """
                         chmod +x welcome_note.sh
                         ./welcome_note.sh
@@ -205,10 +224,28 @@ agent {
                 echo '🚀 Pushing Docker image to Docker Hub...'
                 script {
                     docker.withRegistry('https://registry.hub.docker.com', "${DOCKER_HUB_CREDENTIALS_ID}") {
+                        dockerImage.push("${IMAGE_TAG}")
                         dockerImage.push("latest")
                     }
                 }
                 echo '✅ Docker image pushed successfully.'
+            }
+        }
+
+        stage('Deploy_Staging') {
+            steps {
+                echo '🚀 Deploying to Staging...'
+                sh 'kubectl apply -f k8s/staging.yaml'
+                echo '✅ Deployed to Staging.'
+            }
+        }
+
+        stage('Deploy_Prod') {
+            steps {
+                input message: 'Deploy to Production?'
+                echo '🚀 Deploying to Production...'
+                sh 'kubectl apply -f k8s/prod.yaml'
+                echo '✅ Deployed to Production.'
             }
         }
     }
@@ -216,6 +253,8 @@ agent {
     post {
         success {
             echo 'Build & Deploy completed successfully!'
+            slackSend(channel: '#ci-cd', message: "✅ Pipeline ${env.JOB_NAME} #${env.BUILD_NUMBER} succeeded!")
+            githubNotify(status: 'SUCCESS', description: 'Build succeeded')
             mail to: "${EMAIL_RECIPIENTS}",
                  subject: "SUCCESS: ${env.JOB_NAME} [#${env.BUILD_NUMBER}]",
                  body: """\
@@ -245,6 +284,8 @@ View the full job here: ${env.BUILD_URL}
                     echo "Failed to determine author or trigger: ${e.message}"
                 }
 
+                slackSend(channel: '#ci-cd', message: "❌ Pipeline ${env.JOB_NAME} #${env.BUILD_NUMBER} failed!")
+                githubNotify(status: 'FAILURE', description: 'Build failed')
                 mail to: "${EMAIL_RECIPIENTS}",
                      subject: "FAILURE: ${env.JOB_NAME} [#${env.BUILD_NUMBER}]",
                      body: """\
@@ -282,6 +323,8 @@ Please investigate the issue.
                     echo "Failed to determine author or trigger: ${e.message}"
                 }
 
+                slackSend(channel: '#ci-cd', message: "⚠️ Pipeline ${env.JOB_NAME} #${env.BUILD_NUMBER} is unstable!")
+                githubNotify(status: 'ERROR', description: 'Build unstable')
                 mail to: "${EMAIL_RECIPIENTS}",
                      subject: "UNSTABLE: ${env.JOB_NAME} [#${env.BUILD_NUMBER}]",
                      body: """\
@@ -308,7 +351,3 @@ Please investigate the warning.
         }
     }
 }
-
-
-
-
