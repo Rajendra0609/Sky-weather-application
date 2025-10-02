@@ -250,6 +250,17 @@ agent {
         success {
             echo 'Build & Deploy completed successfully!'
             slackSend(channel: '#doc_jen_task_tracker', message: "✅ Pipeline ${env.JOB_NAME} #${env.BUILD_NUMBER} succeeded!")
+            slackSend(
+                channel: '#doc_jen_task_tracker',
+                message: """
+                    :warning: *Pipeline Alert*
+                    *Job:* `${env.JOB_NAME}`
+                    *Build #:* `${env.BUILD_NUMBER}`
+                    *Status:* Passed ✅
+                    Please investigate the pipeline failure. :mag_right:
+                    <${env.BUILD_URL}|View Build Logs>
+                    """
+                )
             mail to: "${EMAIL_RECIPIENTS}",
                  subject: "SUCCESS: ${env.JOB_NAME} [#${env.BUILD_NUMBER}]",
                  body: """\
@@ -279,7 +290,17 @@ View the full job here: ${env.BUILD_URL}
                     echo "Failed to determine author or trigger: ${e.message}"
                 }
 
-                slackSend(channel: '#doc_jen_task_tracker', message: "❌ Pipeline ${env.JOB_NAME} #${env.BUILD_NUMBER} failed!")
+                slackSend(
+                channel: '#doc_jen_task_tracker',
+                message: """
+                    :warning: *Pipeline Alert*
+                    *Job:* `${env.JOB_NAME}`
+                    *Build #:* `${env.BUILD_NUMBER}`
+                    *Status:* FAILED ❌
+                    Please investigate the pipeline failure. :mag_right:
+                    <${env.BUILD_URL}|View Build Logs>
+                    """
+                )
                 mail to: "${EMAIL_RECIPIENTS}",
                      subject: "FAILURE: ${env.JOB_NAME} [#${env.BUILD_NUMBER}]",
                      body: """\
@@ -317,8 +338,18 @@ Please investigate the issue.
                     echo "Failed to determine author or trigger: ${e.message}"
                 }
 
-                slackSend(channel: '#doc_jen_task_tracker', message: "⚠️ Pipeline ${env.JOB_NAME} #${env.BUILD_NUMBER} is unstable!")
-                githubNotify(status: 'ERROR', description: 'Build unstable')
+                slackSend(
+                channel: '#doc_jen_task_tracker',
+                message: """
+                    :warning: *Pipeline Alert*
+                    *Job:* `${env.JOB_NAME}`
+                    *Build #:* `${env.BUILD_NUMBER}`
+                    *Status:* UNSTABLE ⚠️
+                    Please investigate the pipeline failure. :mag_right:
+                    <${env.BUILD_URL}|View Build Logs>
+                    """
+                )
+
                 mail to: "${EMAIL_RECIPIENTS}",
                      subject: "UNSTABLE: ${env.JOB_NAME} [#${env.BUILD_NUMBER}]",
                      body: """\
