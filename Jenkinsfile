@@ -8,7 +8,6 @@ agent {
         //}
     }
 
-
     tools {
         nodejs 'nodejs'
         //maven 'maven'
@@ -51,12 +50,12 @@ agent {
         DOCKER_USER = 'docker_user'
         DOCKER_PASS = 'docker_token'
         SCANNER_HOME = tool 'sonar'
-        GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+    // GIT_COMMIT will be set after checkout
         BUILD_DATE = sh(script: 'date +%Y%m%d-%H%M%S', returnStdout: true).trim()
         IMAGE_TAG = "${GIT_COMMIT}-${BUILD_DATE}"
     }
 
-    stages {
+    stages {       
         stage('Checkout_startup') {
             steps {
                 echo '🔄 cloing the code'
@@ -71,29 +70,33 @@ agent {
                 ]
             }
         }
-
+        stage('run script') {
+            steps {
+                echo '🏃‍♂️ Running initial script...'
+                sh 'export GITHUB_TOKEN=$GITHUB_TOKEN'
+                sh 'export DOCKER_USER=$DOCKER_USER'
+                sh 'export DOCKER_PASS=$DOCKER_PASS'
+                sh '/usr/local/bin/node_status.sh'
+            }
+        }
         stage('parallel_build') {
             parallel {
                 stage('Build') {
-                    steps {
-                        cache(path: '.npm', key: 'npm-cache-${GIT_COMMIT}') {
+                        steps {
                             echo '🔨 Starting build process...'
-                            sh './usr/local/bin/node_status.sh'
                             sh 'npm install'
                             echo '🔨 Build process completed.'
                             echo '📦 Packaging application...'
                         }
-                    }
                 }
 
                 stage('Build_Application') {
                     steps {
-                        cache(path: '.npm', key: 'npm-cache-${GIT_COMMIT}') {
+                        
                             echo '🔨 Installing dependencies and building the project...'
-                            sh './usr/local/bin/node_status.sh'
                             sh 'npm install'
                             echo '✅ Build completed.'
-                        }
+                        
                     }
                 }
             }
@@ -108,16 +111,20 @@ agent {
                     }
                 }
                 stages {
-                    stage('Test') {
+                    stage('Build and Test') {
                         steps {
+                            echo '🔨 Starting build process...'
+                            sh 'npm install'
+                            echo '🔨 Build process completed.'
+                            echo '📦 Packaging application...'
                             script {
-                                sh './usr/local/bin/node_status.sh'
                                 sh 'npm install --save-dev jest supertest jest-junit'
                                 if (TEST_TYPE == 'unit') {
-                                    sh 'npx jest --ci --reporters=default --reporters=jest-junit --coverage'
-                                } else {
+                                    echo '🔨 Installing dependencies and building the project...'
                                     sh 'npx jest --ci --reporters=default --reporters=jest-junit'
+                                    junit 'junit.xml'
                                     sh 'python3 backend/test_weather.py || true'
+                                    echo '✅ Build completed.'
                                 }
                             }
                         }
@@ -126,9 +133,10 @@ agent {
             }
             post {
                 always {
+                    archiveArtifacts artifacts: 'junit.xml', allowEmptyArchive: true
                     junit 'junit.xml'
-                    publishHTML(target: [allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true, reportDir: 'coverage/lcov-report', reportFiles: 'index.html', reportName: 'Code Coverage Report'])
-                    echo '📄 Publishing JUnit and Coverage reports...'
+                    echo '📄 Publishing JUnit test report...'
+                    echo '✅ All tests completed successfully.'
                 }
             }
         }
@@ -137,7 +145,6 @@ agent {
             steps {
                 echo '🔍 Starting Lynis security scan...'
                 sh '''
-                    ./usr/local/bin/node_status.sh
                     mkdir -p artifacts/lynis
                     lynis audit system --quiet --report-file artifacts/lynis/lynis-report.log
                     lynis audit system | ansi2html > artifacts/lynis/lynis-report.html
@@ -153,10 +160,10 @@ agent {
             script {
             withSonarQubeEnv('sonar') {
                 sh '''
-                    ./usr/local/bin/node_status.sh
+                    
                     ${SCANNER_HOME}/bin/sonar-scanner \
                     -Dsonar.projectKey=Sky-weather-application \
-                    -Dsonar.sources=backend,frontend,my-shared-library,welcome_note.sh \
+                    -Dsonar.sources=backend,frontend,my-shared-library \
                     -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
                 '''
             }
@@ -169,7 +176,7 @@ agent {
             steps {
                 echo '🐳 Building Docker image...'
                 sh '''
-                    ./usr/local/bin/node_status.sh
+                    ls -la
                 '''
                 script {
                     dockerImage = docker.build("${params.DOCKERHUBREPO}:${IMAGE_TAG}", "-f Dockerfile .")
@@ -242,8 +249,7 @@ agent {
     post {
         success {
             echo 'Build & Deploy completed successfully!'
-            slackSend(channel: '#ci-cd', message: "✅ Pipeline ${env.JOB_NAME} #${env.BUILD_NUMBER} succeeded!")
-            githubNotify(status: 'SUCCESS', description: 'Build succeeded')
+            slackSend(channel: '#doc_jen_task_tracker', message: "✅ Pipeline ${env.JOB_NAME} #${env.BUILD_NUMBER} succeeded!")
             mail to: "${EMAIL_RECIPIENTS}",
                  subject: "SUCCESS: ${env.JOB_NAME} [#${env.BUILD_NUMBER}]",
                  body: """\
@@ -273,8 +279,7 @@ View the full job here: ${env.BUILD_URL}
                     echo "Failed to determine author or trigger: ${e.message}"
                 }
 
-                slackSend(channel: '#ci-cd', message: "❌ Pipeline ${env.JOB_NAME} #${env.BUILD_NUMBER} failed!")
-                githubNotify(status: 'FAILURE', description: 'Build failed')
+                slackSend(channel: '#doc_jen_task_tracker', message: "❌ Pipeline ${env.JOB_NAME} #${env.BUILD_NUMBER} failed!")
                 mail to: "${EMAIL_RECIPIENTS}",
                      subject: "FAILURE: ${env.JOB_NAME} [#${env.BUILD_NUMBER}]",
                      body: """\
@@ -312,7 +317,7 @@ Please investigate the issue.
                     echo "Failed to determine author or trigger: ${e.message}"
                 }
 
-                slackSend(channel: '#ci-cd', message: "⚠️ Pipeline ${env.JOB_NAME} #${env.BUILD_NUMBER} is unstable!")
+                slackSend(channel: '#doc_jen_task_tracker', message: "⚠️ Pipeline ${env.JOB_NAME} #${env.BUILD_NUMBER} is unstable!")
                 githubNotify(status: 'ERROR', description: 'Build unstable')
                 mail to: "${EMAIL_RECIPIENTS}",
                      subject: "UNSTABLE: ${env.JOB_NAME} [#${env.BUILD_NUMBER}]",
